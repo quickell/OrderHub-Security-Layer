@@ -10,6 +10,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Запускаем только если в Settings → Secrets задан GCP_PROJECT_ID (иначе первый пуш без GKE даёт красный крестик)
+    if: ${{ secrets.GCP_PROJECT_ID != '' }}
     outputs:
       auth_image: ${{ steps.meta.outputs.auth_image }}
       gateway_image: ${{ steps.meta.outputs.gateway_image }}
