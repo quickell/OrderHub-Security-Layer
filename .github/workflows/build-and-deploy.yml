@@ -1,0 +1,74 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [master, main]
+
+env:
+  REGISTRY: gcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      auth_image: ${{ steps.meta.outputs.auth_image }}
+      gateway_image: ${{ steps.meta.outputs.gateway_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Docker auth
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build and push authorization-server
+        run: |
+          docker build -f authorization-server/Dockerfile -t ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/authorization-server:${{ github.sha }} .
+          docker push ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/authorization-server:${{ github.sha }}
+
+      - name: Build and push gateway
+        run: |
+          docker build -f gateway/Dockerfile -t ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/gateway:${{ github.sha }} .
+          docker push ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/gateway:${{ github.sha }}
+
+      - id: meta
+        run: |
+          echo "auth_image=${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/authorization-server:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "gateway_image=${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/gateway:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --zone ${{ secrets.GKE_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Update deployment images and rollout
+        run: |
+          kubectl set image deployment/authorization-server authorization-server=${{ needs.build-and-push.outputs.auth_image }} -n orderhub
+          kubectl set image deployment/gateway gateway=${{ needs.build-and-push.outputs.gateway_image }} -n orderhub
+          kubectl rollout status deployment/authorization-server -n orderhub --timeout=120s
+          kubectl rollout status deployment/gateway -n orderhub --timeout=120s

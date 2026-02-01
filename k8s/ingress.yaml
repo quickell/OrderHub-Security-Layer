@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: orderhub-ingress
+  namespace: orderhub
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    # For HTTPS (optional): use managed cert or your cert
+    # networking.gke.io/managed-certificates: "orderhub-cert"
+spec:
+  rules:
+    - host: REPLACE_WITH_YOUR_DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+            port:
+              number: 8080
+  defaultBackend:
+    service:
+      name: gateway
+      port:
+        number: 8080

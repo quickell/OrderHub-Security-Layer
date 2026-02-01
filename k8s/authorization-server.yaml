@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authorization-server
+  namespace: orderhub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authorization-server
+  template:
+    metadata:
+      labels:
+        app: authorization-server
+    spec:
+      containers:
+        - name: authorization-server
+          image: authorization-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9000
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: JWT_SECRET
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GOOGLE_CLIENT_SECRET
+            - name: FRONTEND_LOGIN_CALLBACK
+              value: "https://REPLACE_WITH_YOUR_DOMAIN/theGame/login/callback"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authorization-server
+  namespace: orderhub
+spec:
+  selector:
+    app: authorization-server
+  ports:
+    - port: 9000
+      targetPort: 9000

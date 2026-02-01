@@ -1,0 +1,86 @@
+services:
+  authorization-server:
+    build:
+      context: .
+      dockerfile: authorization-server/Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - JWT_SECRET=${JWT_SECRET:-mySecretKeyForJWTTokenGenerationMustBeAtLeast256BitsLongForSecurity}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=http://localhost:8080/auth/login/oauth2/code/google
+      - FRONTEND_LOGIN_CALLBACK=${FRONTEND_LOGIN_CALLBACK:-http://localhost:3000/login/callback}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9000/auth/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-mySecretKeyForJWTTokenGenerationMustBeAtLeast256BitsLongForSecurity}
+      - AUTHORIZATION_SERVER_URI=http://authorization-server:9000
+      - JAVA_BACKEND_URI=http://java-backend:8081
+      - FRONTEND_URI=http://frontend:80
+    depends_on:
+      authorization-server:
+        condition: service_healthy
+      java-backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: orders_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Set context to your java-backend project root (must contain Dockerfile)
+  java-backend:
+    build:
+      context: D:/dz/Task2_SpringBootREST  # change to your path
+      dockerfile: Dockerfile
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orders_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - JWT_SECRET=${JWT_SECRET:-mySecretKeyForJWTTokenGenerationMustBeAtLeast256BitsLongForSecurity}
+      - KAFKA_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Set context to your frontend (React) project root (must contain Dockerfile)
+  frontend:
+    build:
+      context: ../OrderHub  # change to your path
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:

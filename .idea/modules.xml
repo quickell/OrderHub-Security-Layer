@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/pom.xml" filepath="$PROJECT_DIR$/pom.xml" />
+      <module fileurl="file://$PROJECT_DIR$/authorization-server/pom.xml" filepath="$PROJECT_DIR$/authorization-server/pom.xml" />
+      <module fileurl="file://$PROJECT_DIR$/gateway/pom.xml" filepath="$PROJECT_DIR$/gateway/pom.xml" />
+    </modules>
+  </component>
+</project>

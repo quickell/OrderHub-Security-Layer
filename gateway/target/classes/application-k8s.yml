@@ -1,0 +1,41 @@
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: authorization-server-oauth
+          uri: http://authorization-server:9000
+          order: 1
+          predicates:
+            - Path=/auth/oauth2/**
+          filters:
+            - StripPrefix=1
+        - id: authorization-server
+          uri: http://authorization-server:9000
+          order: 1
+          predicates:
+            - Path=/auth/**
+          filters:
+            - StripPrefix=0
+        - id: java-backend
+          uri: http://java-backend:8081
+          order: 1
+          predicates:
+            - Path=/api/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthentication
+        - id: nodejs-backend
+          uri: http://nodejs-backend:3002
+          order: 2
+          predicates:
+            - Path=/api/entity3/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthentication
+        - id: frontend
+          uri: http://frontend:80
+          order: 10
+          predicates:
+            - Path=/**
+          filters:
+            - StripPrefix=0
